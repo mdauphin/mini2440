@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: main.cpp Example File (demos/embedded/flickable/main.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">main.cpp Example File<br /><span class="small-subtitle">demos/embedded/flickable/main.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the demonstration applications of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &lt;QtCore&gt;
+ #include &lt;QtGui&gt;
+
+ #include &quot;flickable.h&quot;
+
+<span class="comment"> // Returns a list of two-word color names</span>
+ static QStringList colorPairs(int max)
+ {
+     <span class="comment">// capitalize the first letter</span>
+     QStringList colors = QColor::colorNames();
+     colors.removeAll(&quot;transparent&quot;);
+     int num = colors.count();
+     for (int c = 0; c &lt; num; ++c)
+         colors[c] = colors[c][0].toUpper() + colors[c].mid(1);
+
+     <span class="comment">// combine two colors, e.g. &quot;lime skyblue&quot;</span>
+     QStringList combinedColors;
+     for (int i = 0; i &lt; num; ++i)
+         for (int j = 0; j &lt; num; ++j)
+             combinedColors &lt;&lt; QString(&quot;%1 %2&quot;).arg(colors[i]).arg(colors[j]);
+
+     <span class="comment">// randomize it</span>
+     colors.clear();
+     while (combinedColors.count()) {
+         int i = qrand() % combinedColors.count();
+         colors &lt;&lt; combinedColors[i];
+         combinedColors.removeAt(i);
+         if (colors.count() == max)
+             break;
+     }
+
+     return colors;
+ }
+
+ class ColorList : public QWidget, public Flickable
+ {
+     Q_OBJECT
+
+ public:
+     ColorList(QWidget *parent = 0)
+             : QWidget(parent) {
+         m_offset = 0;
+         m_height = QFontMetrics(font()).height() + 5;
+         m_highlight = -1;
+         m_selected = -1;
+
+         QStringList colors = colorPairs(999);
+         for (int i = 0; i &lt; colors.count(); ++i) {
+             QString c = colors[i];
+             QString str;
+             str.sprintf(&quot;%4d&quot;, i + 1);
+             m_colorNames &lt;&lt; (str + &quot;   &quot; + c);
+
+             QStringList duet = c.split(' ');
+             m_firstColor &lt;&lt; duet[0];
+             m_secondColor &lt;&lt; duet[1];
+         }
+
+         setAttribute(Qt::WA_OpaquePaintEvent, true);
+         setAttribute(Qt::WA_NoSystemBackground, true);
+
+         setMouseTracking(true);
+         Flickable::setAcceptMouseClick(this);
+     }
+
+ protected:
+     <span class="comment">// reimplement from Flickable</span>
+     virtual QPoint scrollOffset() const {
+         return QPoint(0, m_offset);
+     }
+
+     <span class="comment">// reimplement from Flickable</span>
+     virtual void setScrollOffset(const QPoint &amp;offset) {
+         int yy = offset.y();
+         if (yy != m_offset) {
+             m_offset = qBound(0, yy, m_height * m_colorNames.count() - height());
+             update();
+         }
+     }
+
+ protected:
+     void paintEvent(QPaintEvent *event) {
+         QPainter p(this);
+         p.fillRect(event-&gt;rect(), Qt::white);
+         int start = m_offset / m_height;
+         int y = start * m_height - m_offset;
+         if (m_offset &lt;= 0) {
+             start = 0;
+             y = -m_offset;
+         }
+         int end = start + height() / m_height + 1;
+         if (end &gt; m_colorNames.count() - 1)
+             end = m_colorNames.count() - 1;
+         for (int i = start; i &lt;= end; ++i, y += m_height) {
+
+             p.setBrush(Qt::NoBrush);
+             p.setPen(Qt::black);
+             if (i == m_highlight) {
+                 p.fillRect(0, y, width(), m_height, QColor(0, 64, 128));
+                 p.setPen(Qt::white);
+             }
+             if (i == m_selected) {
+                 p.fillRect(0, y, width(), m_height, QColor(0, 128, 240));
+                 p.setPen(Qt::white);
+             }
+
+             p.drawText(m_height + 2, y, width(), m_height, Qt::AlignVCenter, m_colorNames[i]);
+
+             p.setPen(Qt::NoPen);
+             p.setBrush(m_firstColor[i]);
+             p.drawRect(1, y + 1, m_height - 2, m_height - 2);
+             p.setBrush(m_secondColor[i]);
+             p.drawRect(5, y + 5, m_height - 11, m_height - 11);
+         }
+         p.end();
+     }
+
+     void keyReleaseEvent(QKeyEvent *event) {
+         if (event-&gt;key() == Qt::Key_Down) {
+             m_offset += 20;
+             event-&gt;accept();
+             update();
+             return;
+         }
+         if (event-&gt;key() == Qt::Key_Up) {
+             m_offset -= 20;
+             event-&gt;accept();
+             update();
+             return;
+         }
+     }
+
+     void mousePressEvent(QMouseEvent *event) {
+         Flickable::handleMousePress(event);
+         if (event-&gt;isAccepted())
+             return;
+
+         if (event-&gt;button() == Qt::LeftButton) {
+             int y = event-&gt;pos().y() + m_offset;
+             int i = y / m_height;
+             if (i != m_highlight) {
+                 m_highlight = i;
+                 m_selected = -1;
+                 update();
+             }
+             event-&gt;accept();
+         }
+     }
+
+     void mouseMoveEvent(QMouseEvent *event) {
+         Flickable::handleMouseMove(event);
+     }
+
+     void mouseReleaseEvent(QMouseEvent *event) {
+         Flickable::handleMouseRelease(event);
+         if (event-&gt;isAccepted())
+             return;
+
+         if (event-&gt;button() == Qt::LeftButton) {
+             m_selected = m_highlight;
+             event-&gt;accept();
+             update();
+         }
+     }
+
+ private:
+     int m_offset;
+     int m_height;
+     int m_highlight;
+     int m_selected;
+     QStringList m_colorNames;
+     QList&lt;QColor&gt; m_firstColor;
+     QList&lt;QColor&gt; m_secondColor;
+ };
+
+ #include &quot;main.moc&quot;
+
+ int main(int argc, char *argv[])
+ {
+     QApplication app(argc, argv);
+
+     ColorList list;
+     list.setWindowTitle(&quot;Kinetic Scrolling&quot;);
+ #if defined(Q_OS_SYMBIAN) || defined(Q_OS_WINCE_WM)
+     list.showMaximized();
+ #else
+     list.resize(320, 320);
+     list.show();
+ #endif
+
+     return app.exec();
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

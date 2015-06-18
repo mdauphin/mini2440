@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: httpwindow.cpp Example File (network/http/httpwindow.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">httpwindow.cpp Example File<br /><span class="small-subtitle">network/http/httpwindow.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the examples of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &lt;QtGui&gt;
+ #include &lt;QtNetwork&gt;
+
+ #include &quot;httpwindow.h&quot;
+ #include &quot;ui_authenticationdialog.h&quot;
+
+ HttpWindow::HttpWindow(QWidget *parent)
+     : QDialog(parent)
+ {
+ #ifndef QT_NO_OPENSSL
+     urlLineEdit = new QLineEdit(&quot;https:<span class="comment">//qt.nokia.com/&quot;);</span>
+ #else
+     urlLineEdit = new QLineEdit(&quot;http:<span class="comment">//qt.nokia.com/&quot;);</span>
+ #endif
+
+     urlLabel = new QLabel(tr(&quot;&amp;URL:&quot;));
+     urlLabel-&gt;setBuddy(urlLineEdit);
+     statusLabel = new QLabel(tr(&quot;Please enter the URL of a file you want to &quot;
+                                 &quot;download.&quot;));
+
+     downloadButton = new QPushButton(tr(&quot;Download&quot;));
+     downloadButton-&gt;setDefault(true);
+     quitButton = new QPushButton(tr(&quot;Quit&quot;));
+     quitButton-&gt;setAutoDefault(false);
+
+     buttonBox = new QDialogButtonBox;
+     buttonBox-&gt;addButton(downloadButton, QDialogButtonBox::ActionRole);
+     buttonBox-&gt;addButton(quitButton, QDialogButtonBox::RejectRole);
+
+     progressDialog = new QProgressDialog(this);
+
+     connect(urlLineEdit, SIGNAL(textChanged(QString)),
+             this, SLOT(enableDownloadButton()));
+
+     connect(&amp;qnam, SIGNAL(authenticationRequired(QNetworkReply*,QAuthenticator*)),
+             this, SLOT(slotAuthenticationRequired(QNetworkReply*,QAuthenticator*)));
+ #ifndef QT_NO_OPENSSL
+     connect(&amp;qnam, SIGNAL(sslErrors(QNetworkReply*,QList&lt;QSslError&gt;)),
+             this, SLOT(sslErrors(QNetworkReply*,QList&lt;QSslError&gt;)));
+ #endif
+     connect(progressDialog, SIGNAL(canceled()), this, SLOT(cancelDownload()));
+     connect(downloadButton, SIGNAL(clicked()), this, SLOT(downloadFile()));
+     connect(quitButton, SIGNAL(clicked()), this, SLOT(close()));
+
+     QHBoxLayout *topLayout = new QHBoxLayout;
+     topLayout-&gt;addWidget(urlLabel);
+     topLayout-&gt;addWidget(urlLineEdit);
+
+     QVBoxLayout *mainLayout = new QVBoxLayout;
+     mainLayout-&gt;addLayout(topLayout);
+     mainLayout-&gt;addWidget(statusLabel);
+     mainLayout-&gt;addWidget(buttonBox);
+     setLayout(mainLayout);
+
+     setWindowTitle(tr(&quot;HTTP&quot;));
+     urlLineEdit-&gt;setFocus();
+ }
+
+ void HttpWindow::startRequest(QUrl url)
+ {
+     reply = qnam.get(QNetworkRequest(url));
+     connect(reply, SIGNAL(finished()),
+             this, SLOT(httpFinished()));
+     connect(reply, SIGNAL(readyRead()),
+             this, SLOT(httpReadyRead()));
+     connect(reply, SIGNAL(downloadProgress(qint64,qint64)),
+             this, SLOT(updateDataReadProgress(qint64,qint64)));
+ }
+
+ void HttpWindow::downloadFile()
+ {
+     url = urlLineEdit-&gt;text();
+
+     QFileInfo fileInfo(url.path());
+     QString fileName = fileInfo.fileName();
+     if (fileName.isEmpty())
+         fileName = &quot;index.html&quot;;
+
+     if (QFile::exists(fileName)) {
+         if (QMessageBox::question(this, tr(&quot;HTTP&quot;),
+                                   tr(&quot;There already exists a file called %1 in &quot;
+                                      &quot;the current directory. Overwrite?&quot;).arg(fileName),
+                                   QMessageBox::Yes|QMessageBox::No, QMessageBox::No)
+             == QMessageBox::No)
+             return;
+         QFile::remove(fileName);
+     }
+
+     file = new QFile(fileName);
+     if (!file-&gt;open(QIODevice::WriteOnly)) {
+         QMessageBox::information(this, tr(&quot;HTTP&quot;),
+                                  tr(&quot;Unable to save the file %1: %2.&quot;)
+                                  .arg(fileName).arg(file-&gt;errorString()));
+         delete file;
+         file = 0;
+         return;
+     }
+
+     progressDialog-&gt;setWindowTitle(tr(&quot;HTTP&quot;));
+     progressDialog-&gt;setLabelText(tr(&quot;Downloading %1.&quot;).arg(fileName));
+     downloadButton-&gt;setEnabled(false);
+
+     <span class="comment">// schedule the request</span>
+     httpRequestAborted = false;
+     startRequest(url);
+ }
+
+ void HttpWindow::cancelDownload()
+ {
+     statusLabel-&gt;setText(tr(&quot;Download canceled.&quot;));
+     httpRequestAborted = true;
+     reply-&gt;abort();
+     downloadButton-&gt;setEnabled(true);
+ }
+
+ void HttpWindow::httpFinished()
+ {
+     if (httpRequestAborted) {
+         if (file) {
+             file-&gt;close();
+             file-&gt;remove();
+             delete file;
+             file = 0;
+         }
+         reply-&gt;deleteLater();
+         progressDialog-&gt;hide();
+         return;
+     }
+
+     progressDialog-&gt;hide();
+     file-&gt;flush();
+     file-&gt;close();
+
+     QVariant redirectionTarget = reply-&gt;attribute(QNetworkRequest::RedirectionTargetAttribute);
+     if (reply-&gt;error()) {
+         file-&gt;remove();
+         QMessageBox::information(this, tr(&quot;HTTP&quot;),
+                                  tr(&quot;Download failed: %1.&quot;)
+                                  .arg(reply-&gt;errorString()));
+         downloadButton-&gt;setEnabled(true);
+     } else if (!redirectionTarget.isNull()) {
+         QUrl newUrl = url.resolved(redirectionTarget.toUrl());
+         if (QMessageBox::question(this, tr(&quot;HTTP&quot;),
+                                   tr(&quot;Redirect to %1 ?&quot;).arg(newUrl.toString()),
+                                   QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+             url = newUrl;
+             reply-&gt;deleteLater();
+             file-&gt;open(QIODevice::WriteOnly);
+             file-&gt;resize(0);
+             startRequest(url);
+             return;
+         }
+     } else {
+         QString fileName = QFileInfo(QUrl(urlLineEdit-&gt;text()).path()).fileName();
+         statusLabel-&gt;setText(tr(&quot;Downloaded %1 to current directory.&quot;).arg(fileName));
+         downloadButton-&gt;setEnabled(true);
+     }
+
+     reply-&gt;deleteLater();
+     reply = 0;
+     delete file;
+     file = 0;
+ }
+
+ void HttpWindow::httpReadyRead()
+ {
+     <span class="comment">// this slot gets called everytime the QNetworkReply has new data.</span>
+     <span class="comment">// We read all of its new data and write it into the file.</span>
+     <span class="comment">// That way we use less RAM than when reading it at the finished()</span>
+     <span class="comment">// signal of the QNetworkReply</span>
+     if (file)
+         file-&gt;write(reply-&gt;readAll());
+ }
+
+ void HttpWindow::updateDataReadProgress(qint64 bytesRead, qint64 totalBytes)
+ {
+     if (httpRequestAborted)
+         return;
+
+     progressDialog-&gt;setMaximum(totalBytes);
+     progressDialog-&gt;setValue(bytesRead);
+ }
+
+ void HttpWindow::enableDownloadButton()
+ {
+     downloadButton-&gt;setEnabled(!urlLineEdit-&gt;text().isEmpty());
+ }
+
+ void HttpWindow::slotAuthenticationRequired(QNetworkReply*,QAuthenticator *authenticator)
+ {
+     QDialog dlg;
+     Ui::Dialog ui;
+     ui.setupUi(&amp;dlg);
+     dlg.adjustSize();
+     ui.siteDescription-&gt;setText(tr(&quot;%1 at %2&quot;).arg(authenticator-&gt;realm()).arg(url.host()));
+
+     <span class="comment">// Did the URL have information? Fill the UI</span>
+     <span class="comment">// This is only relevant if the URL-supplied credentials were wrong</span>
+     ui.userEdit-&gt;setText(url.userName());
+     ui.passwordEdit-&gt;setText(url.password());
+
+     if (dlg.exec() == QDialog::Accepted) {
+         authenticator-&gt;setUser(ui.userEdit-&gt;text());
+         authenticator-&gt;setPassword(ui.passwordEdit-&gt;text());
+     }
+ }
+
+ #ifndef QT_NO_OPENSSL
+ void HttpWindow::sslErrors(QNetworkReply*,const QList&lt;QSslError&gt; &amp;errors)
+ {
+     QString errorString;
+     foreach (const QSslError &amp;error, errors) {
+         if (!errorString.isEmpty())
+             errorString += &quot;, &quot;;
+         errorString += error.errorString();
+     }
+
+     if (QMessageBox::warning(this, tr(&quot;HTTP&quot;),
+                              tr(&quot;One or more SSL errors has occurred: %1&quot;).arg(errorString),
+                              QMessageBox::Ignore | QMessageBox::Abort) == QMessageBox::Ignore) {
+         reply-&gt;ignoreSslErrors();
+     }
+ }
+ #endif</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

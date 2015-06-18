@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<!-- simpleselector.qdoc -->
+<head>
+  <title>Qt 4.6: Simple Selector Example</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">Simple Selector Example<br /><span class="subtitle"></span>
+</h1>
+<p>Files:</p>
+<ul>
+<li><a href="webkit-simpleselector-window-cpp.html">webkit/simpleselector/window.cpp</a></li>
+<li><a href="webkit-simpleselector-window-h.html">webkit/simpleselector/window.h</a></li>
+<li><a href="webkit-simpleselector-window-ui.html">webkit/simpleselector/window.ui</a></li>
+<li><a href="webkit-simpleselector-main-cpp.html">webkit/simpleselector/main.cpp</a></li>
+<li><a href="webkit-simpleselector-simpleselector-pro.html">webkit/simpleselector/simpleselector.pro</a></li>
+</ul>
+<p>The Simple Selector example shows how to use <a href="qwebelement.html">QWebElement</a> to access the Document Object Model (DOM) in a Web page.</p>
+<p align="center"><img src="images/webkit-simpleselector.png" /></p><p>The <a href="qwebelement.html">QWebElement</a> class enables access to the document structure and content in a Web page, as represented by a <a href="qwebframe.html">QWebFrame</a> instance. It can be used for basic traversal of the document structure (see the <a href="webkit-domtraversal.html">DOM Traversal Example</a>), to search for particular elements, and to modify any elements found.</p>
+<p>This example uses a <a href="qwebview.html">QWebView</a> widget to display a Web page. A <a href="qlineedit.html">QLineEdit</a> widget and <a href="qpushbutton.html">QPushButton</a> allow the user to enter a query and highlight the results in the page. These widgets are contained in an instance of the <tt>Window</tt> class, which we described below.</p>
+<a name="window-class-definition"></a>
+<h2>Window Class Definition</h2>
+<p>The <tt>Window</tt> class describes the example's user interface and this is partially described by the <tt>window.ui</tt> file, created using <a href="designer-manual.html#qt-designer">Qt Designer</a>:</p>
+<pre> #include &quot;ui_window.h&quot;
+
+ class Window : public QWidget, private Ui::Window
+ {
+     Q_OBJECT
+
+ public:
+     Window(QWidget *parent = 0);
+     void setUrl(const QUrl &amp;url);
+
+ public slots:
+     void on_elementLineEdit_returnPressed();
+     void on_highlightButton_clicked();
+ };</pre>
+<p>We use <a href="designer-using-a-ui-file.html#the-multiple-inheritance-approach">multiple inheritance</a> to include the user interface description. We define slots that will automatically respond to signals emitted by certain user interface controls.</p>
+<a name="window-class-implementation"></a>
+<h2>Window Class Implementation</h2>
+<p>Since the layout of the user interface is provided by the <tt>window.ui</tt> user interface file, we only need to call the <a href="qwidget.html#setupUi">setupUi()</a> in the constructor:</p>
+<pre> Window::Window(QWidget *parent)
+     : QWidget(parent)
+ {
+     setupUi(this);
+ }</pre>
+<p>This adds all the controls to the window and sets up connections between their signals and suitably-named slots in the <tt>Window</tt> class. The <a href="qlineedit.html">QLineEdit</a> instance was given a name of <tt>elementLineEdit</tt> in Qt Designer, so the <tt>on_elementLineEdit_returnPressed()</tt> slot is automatically connected to its <a href="qlineedit.html#returnPressed">returnPressed()</a> signal.</p>
+<p>This slot performs the main work of this example. We begin by obtaining a <a href="qwebframe.html">QWebFrame</a> instance for the current page shown in the <a href="qwebview.html">QWebView</a> widget. Each <a href="qwebframe.html">QWebFrame</a> contains a <a href="qwebelement.html">QWebElement</a> instance that represents the document, and we obtain this in order to examine its contents:</p>
+<pre> void Window::on_elementLineEdit_returnPressed()
+ {
+     QWebFrame *frame = webView-&gt;page()-&gt;mainFrame();
+
+     QWebElement document = frame-&gt;documentElement();
+     QWebElementCollection elements = document.findAll(elementLineEdit-&gt;text());
+
+     foreach (QWebElement element, elements)
+         element.setAttribute(&quot;style&quot;, &quot;background-color: #f0f090&quot;);
+ }</pre>
+<p>Taking the contents of the <a href="qlineedit.html">QLineEdit</a> as the query text, we call the element's <a href="qwebelement.html#findAll">findAll()</a> function to obtain a list of elements that match the query.</p>
+<p>For each element obtained, we modify its style by setting its <tt>style</tt> attribute to give it a yellow background color.</p>
+<p>Since we also want the query to be performed when the user clicks the <b>Highlight</b> button, we also implement the <tt>on_highlightButton_clicked()</tt> slot to simply call the <tt>on_elementLineEdit_returnPressed()</tt> slot when it is invoked:</p>
+<pre> void Window::on_highlightButton_clicked()
+ {
+     on_elementLineEdit_returnPressed();
+ }</pre>
+<p>For completeness, we also implement a <tt>setUrl()</tt> function which simply passes on a <a href="qurl.html">QUrl</a> instance to the equivalent function in the <a href="qwebview.html">QWebView</a> widget:</p>
+<pre> void Window::setUrl(const QUrl &amp;url)
+ {
+     webView-&gt;setUrl(url);
+ }</pre>
+<a name="starting-the-example"></a>
+<h2>Starting the Example</h2>
+<p>The main function implementation is simple. We set up the application, create a <tt>Window</tt> instance, set its URL, and show it:</p>
+<pre> #include &lt;QtGui&gt;
+ #include &quot;window.h&quot;
+
+ int main(int argc, char *argv[])
+ {
+     QApplication app(argc, argv);
+     Window window;
+     window.setUrl(QUrl(&quot;http:<span class="comment">//www.webkit.org&quot;));</span>
+     window.show();
+     return app.exec();
+ }</pre>
+<p>When the application's event loop is run, the <a href="examples.html#webkit">WebKit</a> home page will load, and the user can then begin to start running queries against the contents of the page. The highlighting can only be removed by reloading the page. To do this, open a context menu over the page and select the <b>Reload</b> menu item.</p>
+<a name="further-reading"></a>
+<h2>Further Reading</h2>
+<p>The <a href="qwebelement.html">QWebElement</a> documentation contains more information about DOM access for the <a href="qtwebkit.html">QtWebKit</a> classes.</p>
+<p>In this example, we take advantage of Qt's <a href="designer-using-a-ui-file.html#automatic-connections">auto-connection</a> feature to avoid explicitly connecting signals to slots.</p>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

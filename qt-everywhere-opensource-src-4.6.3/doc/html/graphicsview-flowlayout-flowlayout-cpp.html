@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: flowlayout.cpp Example File (graphicsview/flowlayout/flowlayout.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">flowlayout.cpp Example File<br /><span class="small-subtitle">graphicsview/flowlayout/flowlayout.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the examples of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &quot;flowlayout.h&quot;
+ #include &lt;QtGui/qwidget.h&gt;
+ #include &lt;QtCore/qmath.h&gt;
+
+ FlowLayout::FlowLayout()
+ {
+     m_spacing[0] = 6;
+     m_spacing[1] = 6;
+     QSizePolicy sp = sizePolicy();
+     sp.setHeightForWidth(true);
+     setSizePolicy(sp);
+ }
+
+ void FlowLayout::insertItem(int index, QGraphicsLayoutItem *item)
+ {
+     item-&gt;setParentLayoutItem(this);
+     if (uint(index) &gt; uint(m_items.count()))
+         index = m_items.count();
+     m_items.insert(index, item);
+     invalidate();
+ }
+
+ int FlowLayout::count() const
+ {
+     return m_items.count();
+ }
+
+ QGraphicsLayoutItem *FlowLayout::itemAt(int index) const
+ {
+     return m_items.value(index);
+ }
+
+ void FlowLayout::removeAt(int index)
+ {
+     m_items.removeAt(index);
+     invalidate();
+ }
+
+ qreal FlowLayout::spacing(Qt::Orientation o) const
+ {
+     return m_spacing[int(o) - 1];
+ }
+
+ void FlowLayout::setSpacing(Qt::Orientations o, qreal spacing)
+ {
+     if (o &amp; Qt::Horizontal)
+         m_spacing[0] = spacing;
+     if (o &amp; Qt::Vertical)
+         m_spacing[1] = spacing;
+ }
+
+ void FlowLayout::setGeometry(const QRectF &amp;geom)
+ {
+     QGraphicsLayout::setGeometry(geom);
+     doLayout(geom, true);
+ }
+
+ qreal FlowLayout::doLayout(const QRectF &amp;geom, bool applyNewGeometry) const
+ {
+     qreal left, top, right, bottom;
+     getContentsMargins(&amp;left, &amp;top, &amp;right, &amp;bottom);
+     const qreal maxw = geom.width() - left - right;
+
+     qreal x = 0;
+     qreal y = 0;
+     qreal maxRowHeight = 0;
+     QSizeF pref;
+     for (int i = 0; i &lt; m_items.count(); ++i) {
+         QGraphicsLayoutItem *item = m_items.at(i);
+         pref = item-&gt;effectiveSizeHint(Qt::PreferredSize);
+         maxRowHeight = qMax(maxRowHeight, pref.height());
+
+         qreal next_x;
+         next_x = x + pref.width();
+         if (next_x &gt; maxw) {
+             if (x == 0) {
+                 pref.setWidth(maxw);
+             } else {
+                 x = 0;
+                 next_x = pref.width();
+             }
+             y += maxRowHeight + spacing(Qt::Vertical);
+             maxRowHeight = 0;
+         }
+
+         if (applyNewGeometry)
+             item-&gt;setGeometry(QRectF(QPointF(left + x, top + y), pref));
+         x = next_x + spacing(Qt::Horizontal);
+     }
+     maxRowHeight = qMax(maxRowHeight, pref.height());
+     return top + y + maxRowHeight + bottom;
+ }
+
+ QSizeF FlowLayout::minSize(const QSizeF &amp;constraint) const
+ {
+     QSizeF size(0, 0);
+     qreal left, top, right, bottom;
+     getContentsMargins(&amp;left, &amp;top, &amp;right, &amp;bottom);
+     if (constraint.width() &gt;= 0) {   <span class="comment">// height for width</span>
+         const qreal height = doLayout(QRectF(QPointF(0,0), constraint), false);
+         size = QSizeF(constraint.width(), height);
+     } else if (constraint.height() &gt;= 0) {  <span class="comment">// width for height?</span>
+         <span class="comment">// not supported</span>
+     } else {
+         QGraphicsLayoutItem *item;
+         foreach (item, m_items)
+             size = size.expandedTo(item-&gt;effectiveSizeHint(Qt::MinimumSize));
+         size += QSize(left + right, top + bottom);
+     }
+     return size;
+ }
+
+ QSizeF FlowLayout::prefSize() const
+ {
+     qreal left, right;
+     getContentsMargins(&amp;left, 0, &amp;right, 0);
+
+     QGraphicsLayoutItem *item;
+     qreal maxh = 0;
+     qreal totalWidth = 0;
+     foreach (item, m_items) {
+         if (totalWidth &gt; 0)
+             totalWidth += spacing(Qt::Horizontal);
+         QSizeF pref = item-&gt;effectiveSizeHint(Qt::PreferredSize);
+         totalWidth += pref.width();
+         maxh = qMax(maxh, pref.height());
+     }
+     maxh += spacing(Qt::Vertical);
+
+     const qreal goldenAspectRatio = 1.61803399;
+     qreal w = qSqrt(totalWidth * maxh * goldenAspectRatio) + left + right;
+
+     return minSize(QSizeF(w, -1));
+ }
+
+ QSizeF FlowLayout::maxSize() const
+ {
+     QGraphicsLayoutItem *item;
+     qreal totalWidth = 0;
+     qreal totalHeight = 0;
+     foreach (item, m_items) {
+         if (totalWidth &gt; 0)
+             totalWidth += spacing(Qt::Horizontal);
+         if (totalHeight &gt; 0)
+             totalHeight += spacing(Qt::Vertical);
+         QSizeF pref = item-&gt;effectiveSizeHint(Qt::PreferredSize);
+         totalWidth += pref.width();
+         totalHeight += pref.height();
+     }
+
+     qreal left, top, right, bottom;
+     getContentsMargins(&amp;left, &amp;top, &amp;right, &amp;bottom);
+     return QSizeF(left + totalWidth + right, top + totalHeight + bottom);
+ }
+
+ QSizeF FlowLayout::sizeHint(Qt::SizeHint which, const QSizeF &amp;constraint) const
+ {
+     QSizeF sh = constraint;
+     switch (which) {
+     case Qt::PreferredSize:
+         sh = prefSize();
+         break;
+     case Qt::MinimumSize:
+         sh = minSize(constraint);
+         break;
+     case Qt::MaximumSize:
+         sh = maxSize();
+         break;
+     default:
+         break;
+     }
+     return sh;
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

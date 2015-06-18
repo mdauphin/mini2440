@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: fluidlauncher.cpp Example File (demos/embedded/fluidlauncher/fluidlauncher.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">fluidlauncher.cpp Example File<br /><span class="small-subtitle">demos/embedded/fluidlauncher/fluidlauncher.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the demonstration applications of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &lt;QXmlStreamReader&gt;
+
+ #include &quot;fluidlauncher.h&quot;
+
+ #define DEFAULT_INPUT_TIMEOUT 10000
+ #define SIZING_FACTOR_HEIGHT 6/10
+ #define SIZING_FACTOR_WIDTH 6/10
+
+ FluidLauncher::FluidLauncher(QStringList* args)
+ {
+     pictureFlowWidget = new PictureFlow();
+     slideShowWidget = new SlideShow();
+     inputTimer = new QTimer();
+
+     addWidget(pictureFlowWidget);
+     addWidget(slideShowWidget);
+     setCurrentWidget(pictureFlowWidget);
+     pictureFlowWidget-&gt;setFocus();
+
+     QRect screen_size = QApplication::desktop()-&gt;screenGeometry();
+
+     QObject::connect(pictureFlowWidget, SIGNAL(itemActivated(int)), this, SLOT(launchApplication(int)));
+     QObject::connect(pictureFlowWidget, SIGNAL(inputReceived()),    this, SLOT(resetInputTimeout()));
+     QObject::connect(slideShowWidget,   SIGNAL(inputReceived()),    this, SLOT(switchToLauncher()));
+     QObject::connect(inputTimer,        SIGNAL(timeout()),          this, SLOT(inputTimedout()));
+
+     inputTimer-&gt;setSingleShot(true);
+     inputTimer-&gt;setInterval(DEFAULT_INPUT_TIMEOUT);
+
+     const int h = screen_size.height() * SIZING_FACTOR_HEIGHT;
+     const int w = screen_size.width() * SIZING_FACTOR_WIDTH;
+     const int hh = qMin(h, w);
+     const int ww = hh / 3 * 2;
+     pictureFlowWidget-&gt;setSlideSize(QSize(ww, hh));
+
+     bool success;
+     int configIndex = args-&gt;indexOf(&quot;-config&quot;);
+     if ( (configIndex != -1) &amp;&amp; (configIndex != args-&gt;count()-1) )
+         success = loadConfig(args-&gt;at(configIndex+1));
+     else
+         success = loadConfig(&quot;config.xml&quot;);
+
+     if (success) {
+       populatePictureFlow();
+
+       showFullScreen();
+       inputTimer-&gt;start();
+     } else {
+         pictureFlowWidget-&gt;setAttribute(Qt::WA_DeleteOnClose, true);
+         pictureFlowWidget-&gt;close();
+     }
+
+ }
+
+ FluidLauncher::~FluidLauncher()
+ {
+     delete pictureFlowWidget;
+     delete slideShowWidget;
+ }
+
+ bool FluidLauncher::loadConfig(QString configPath)
+ {
+     QFile xmlFile(configPath);
+
+     if (!xmlFile.exists() || (xmlFile.error() != QFile::NoError)) {
+         qDebug() &lt;&lt; &quot;ERROR: Unable to open config file &quot; &lt;&lt; configPath;
+         return false;
+     }
+
+     slideShowWidget-&gt;clearImages();
+
+     xmlFile.open(QIODevice::ReadOnly);
+     QXmlStreamReader reader(&amp;xmlFile);
+     while (!reader.atEnd()) {
+         reader.readNext();
+
+         if (reader.isStartElement()) {
+             if (reader.name() == &quot;demos&quot;)
+                 parseDemos(reader);
+             else if(reader.name() == &quot;slideshow&quot;)
+                 parseSlideshow(reader);
+         }
+     }
+
+     if (reader.hasError()) {
+        qDebug() &lt;&lt; QString(&quot;Error parsing %1 on line %2 column %3: \n%4&quot;)
+                 .arg(configPath)
+                 .arg(reader.lineNumber())
+                 .arg(reader.columnNumber())
+                 .arg(reader.errorString());
+     }
+
+     <span class="comment">// Append an exit Item</span>
+     DemoApplication* exitItem = new DemoApplication(QString(), QLatin1String(&quot;Exit Embedded Demo&quot;), QString(), QStringList());
+     demoList.append(exitItem);
+
+     return true;
+ }
+
+ void FluidLauncher::parseDemos(QXmlStreamReader&amp; reader)
+ {
+     while (!reader.atEnd()) {
+         reader.readNext();
+         if (reader.isStartElement() &amp;&amp; reader.name() == &quot;example&quot;) {
+             QXmlStreamAttributes attrs = reader.attributes();
+             QStringRef filename = attrs.value(&quot;filename&quot;);
+             if (!filename.isEmpty()) {
+                 QStringRef name = attrs.value(&quot;name&quot;);
+                 QStringRef image = attrs.value(&quot;image&quot;);
+                 QStringRef args = attrs.value(&quot;args&quot;);
+
+                 DemoApplication* newDemo = new DemoApplication(
+                         filename.toString(),
+                         name.isEmpty() ? &quot;Unamed Demo&quot; : name.toString(),
+                         image.toString(),
+                         args.toString().split(&quot; &quot;));
+                 demoList.append(newDemo);
+             }
+         } else if(reader.isEndElement() &amp;&amp; reader.name() == &quot;demos&quot;) {
+             return;
+         }
+     }
+ }
+
+ void FluidLauncher::parseSlideshow(QXmlStreamReader&amp; reader)
+ {
+     QXmlStreamAttributes attrs = reader.attributes();
+
+     QStringRef timeout = attrs.value(&quot;timeout&quot;);
+     bool valid;
+     if (!timeout.isEmpty()) {
+         int t = timeout.toString().toInt(&amp;valid);
+         if (valid)
+             inputTimer-&gt;setInterval(t);
+     }
+
+     QStringRef interval = attrs.value(&quot;interval&quot;);
+     if (!interval.isEmpty()) {
+         int i = interval.toString().toInt(&amp;valid);
+         if (valid)
+             slideShowWidget-&gt;setSlideInterval(i);
+     }
+
+     while (!reader.atEnd()) {
+         reader.readNext();
+         if (reader.isStartElement()) {
+             QXmlStreamAttributes attrs = reader.attributes();
+             if (reader.name() == &quot;imagedir&quot;) {
+                 QStringRef dir = attrs.value(&quot;dir&quot;);
+                 slideShowWidget-&gt;addImageDir(dir.toString());
+             } else if(reader.name() == &quot;image&quot;) {
+                 QStringRef image = attrs.value(&quot;image&quot;);
+                 slideShowWidget-&gt;addImage(image.toString());
+             }
+         } else if(reader.isEndElement() &amp;&amp; reader.name() == &quot;slideshow&quot;) {
+             return;
+         }
+     }
+
+ }
+
+ void FluidLauncher::populatePictureFlow()
+ {
+     pictureFlowWidget-&gt;setSlideCount(demoList.count());
+
+     for (int i=demoList.count()-1; i&gt;=0; --i) {
+         pictureFlowWidget-&gt;setSlide(i, *(demoList[i]-&gt;getImage()));
+         pictureFlowWidget-&gt;setSlideCaption(i, demoList[i]-&gt;getCaption());
+     }
+
+     pictureFlowWidget-&gt;setCurrentSlide(demoList.count()/2);
+ }
+
+ void FluidLauncher::launchApplication(int index)
+ {
+     <span class="comment">// NOTE: Clearing the caches will free up more memory for the demo but will cause</span>
+     <span class="comment">// a delay upon returning, as items are reloaded.</span>
+     <span class="comment">//pictureFlowWidget-&gt;clearCaches();</span>
+
+     if (index == demoList.size() -1) {
+         qApp-&gt;quit();
+         return;
+     }
+
+     inputTimer-&gt;stop();
+
+     QObject::connect(demoList[index], SIGNAL(demoFinished()), this, SLOT(demoFinished()));
+
+     demoList[index]-&gt;launch();
+ }
+
+ void FluidLauncher::switchToLauncher()
+ {
+     slideShowWidget-&gt;stopShow();
+     inputTimer-&gt;start();
+     setCurrentWidget(pictureFlowWidget);
+ }
+
+ void FluidLauncher::resetInputTimeout()
+ {
+     if (inputTimer-&gt;isActive())
+         inputTimer-&gt;start();
+ }
+
+ void FluidLauncher::inputTimedout()
+ {
+     switchToSlideshow();
+ }
+
+ void FluidLauncher::switchToSlideshow()
+ {
+     inputTimer-&gt;stop();
+     slideShowWidget-&gt;startShow();
+     setCurrentWidget(slideShowWidget);
+ }
+
+ void FluidLauncher::demoFinished()
+ {
+     setCurrentWidget(pictureFlowWidget);
+     inputTimer-&gt;start();
+
+     <span class="comment">// Bring the Fluidlauncher to the foreground to allow selecting another demo</span>
+     raise();
+     activateWindow();
+ }
+
+ void FluidLauncher::changeEvent(QEvent* event)
+ {
+     if (event-&gt;type() == QEvent::ActivationChange) {
+         if (isActiveWindow()) {
+             if(currentWidget() == pictureFlowWidget) {
+                 resetInputTimeout();
+             } else {
+                 slideShowWidget-&gt;startShow();
+             }
+         } else {
+             inputTimer-&gt;stop();
+             slideShowWidget-&gt;stopShow();
+         }
+     }
+     QStackedWidget::changeEvent(event);
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

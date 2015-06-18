@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: digiflip.cpp Example File (demos/embedded/digiflip/digiflip.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">digiflip.cpp Example File<br /><span class="small-subtitle">demos/embedded/digiflip/digiflip.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the demonstration applications of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &lt;QtCore&gt;
+ #include &lt;QtGui&gt;
+
+ class Digits: public QWidget
+ {
+     Q_OBJECT
+
+ public:
+
+     enum {
+         Slide,
+         Flip,
+         Rotate
+     };
+
+     Digits(QWidget *parent)
+         : QWidget(parent)
+         , m_number(0)
+         , m_transition(Slide)
+     {
+         setAttribute(Qt::WA_OpaquePaintEvent, true);
+         setAttribute(Qt::WA_NoSystemBackground, true);
+         connect(&amp;m_animator, SIGNAL(frameChanged(int)), SLOT(update()));
+         m_animator.setFrameRange(0, 100);
+         m_animator.setDuration(600);
+         m_animator.setCurveShape(QTimeLine::EaseInOutCurve);
+     }
+
+     void setTransition(int tr) {
+         m_transition = tr;
+     }
+
+     int transition() const {
+         return m_transition;
+     }
+
+     void setNumber(int n) {
+         if (m_number != n) {
+             m_number = qBound(0, n, 99);
+             preparePixmap();
+             update();
+         }
+     }
+
+     void flipTo(int n) {
+         if (m_number != n) {
+             m_number = qBound(0, n, 99);
+             m_lastPixmap = m_pixmap;
+             preparePixmap();
+             m_animator.stop();
+             m_animator.start();
+         }
+     }
+
+ protected:
+
+     void drawFrame(QPainter *p, const QRect &amp;rect) {
+         p-&gt;setPen(Qt::NoPen);
+         QLinearGradient gradient(rect.topLeft(), rect.bottomLeft());
+         gradient.setColorAt(0.00, QColor(245, 245, 245));
+         gradient.setColorAt(0.49, QColor(192, 192, 192));
+         gradient.setColorAt(0.51, QColor(245, 245, 245));
+         gradient.setColorAt(1.00, QColor(192, 192, 192));
+         p-&gt;setBrush(gradient);
+         QRect r = rect;
+         p-&gt;drawRoundedRect(r, 15, 15, Qt::RelativeSize);
+         r.adjust(1, 4, -1, -4);
+         p-&gt;setPen(QColor(181, 181, 181));
+         p-&gt;setBrush(Qt::NoBrush);
+         p-&gt;drawRoundedRect(r, 15, 15, Qt::RelativeSize);
+         p-&gt;setPen(QColor(159, 159, 159));
+         int y = rect.top() + rect.height() / 2 - 1;
+         p-&gt;drawLine(rect.left(), y, rect.right(), y);
+     }
+
+     QPixmap drawDigits(int n, const QRect &amp;rect) {
+
+         int scaleFactor = 2;
+ #if defined(Q_OS_SYMBIAN) || defined(Q_OS_WINCE_WM)
+         if (rect.height() &gt; 240)
+             scaleFactor = 1;
+ #endif
+
+         QString str = QString::number(n);
+         if (str.length() == 1)
+             str.prepend(&quot;0&quot;);
+
+         QFont font;
+         font.setFamily(&quot;Helvetica&quot;);
+         int fontHeight = scaleFactor * 0.55 * rect.height();
+         font.setPixelSize(fontHeight);
+         font.setBold(true);
+
+         QPixmap pixmap(rect.size() * scaleFactor);
+         pixmap.fill(Qt::transparent);
+
+         QLinearGradient gradient(QPoint(0, 0), QPoint(0, pixmap.height()));
+         gradient.setColorAt(0.00, QColor(128, 128, 128));
+         gradient.setColorAt(0.49, QColor(64, 64, 64));
+         gradient.setColorAt(0.51, QColor(128, 128, 128));
+         gradient.setColorAt(1.00, QColor(16, 16, 16));
+
+         QPainter p;
+         p.begin(&amp;pixmap);
+         p.setFont(font);
+         QPen pen;
+         pen.setBrush(QBrush(gradient));
+         p.setPen(pen);
+         p.drawText(pixmap.rect(), Qt::AlignCenter, str);
+         p.end();
+
+         return pixmap.scaledToWidth(width(), Qt::SmoothTransformation);
+     }
+
+     void preparePixmap() {
+         m_pixmap = QPixmap(size());
+         m_pixmap.fill(Qt::transparent);
+         QPainter p;
+         p.begin(&amp;m_pixmap);
+         p.drawPixmap(0, 0, drawDigits(m_number, rect()));
+         p.end();
+     }
+
+     void resizeEvent(QResizeEvent*) {
+         preparePixmap();
+         update();
+     }
+
+     void paintStatic() {
+         QPainter p(this);
+         p.fillRect(rect(), Qt::black);
+
+         int pad = width() / 10;
+         drawFrame(&amp;p, rect().adjusted(pad, pad, -pad, -pad));
+         p.drawPixmap(0, 0, m_pixmap);
+     }
+
+     void paintSlide() {
+         QPainter p(this);
+         p.fillRect(rect(), Qt::black);
+
+         int pad = width() / 10;
+         QRect fr = rect().adjusted(pad, pad, -pad, -pad);
+         drawFrame(&amp;p, fr);
+         p.setClipRect(fr);
+
+         int y = height() * m_animator.currentFrame() / 100;
+         p.drawPixmap(0, y, m_lastPixmap);
+         p.drawPixmap(0, y - height(), m_pixmap);
+     }
+
+     void paintFlip() {
+         QPainter p(this);
+ #if !defined(Q_OS_SYMBIAN) &amp;&amp; !defined(Q_OS_WINCE_WM)
+         p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+         p.setRenderHint(QPainter::Antialiasing, true);
+ #endif
+         p.fillRect(rect(), Qt::black);
+
+         int hw = width() / 2;
+         int hh = height() / 2;
+
+         <span class="comment">// behind is the new pixmap</span>
+         int pad = width() / 10;
+         QRect fr = rect().adjusted(pad, pad, -pad, -pad);
+         drawFrame(&amp;p, fr);
+         p.drawPixmap(0, 0, m_pixmap);
+
+         int index = m_animator.currentFrame();
+
+         if (index &lt;= 50) {
+
+             <span class="comment">// the top part of the old pixmap is flipping</span>
+             int angle = -180 * index / 100;
+             QTransform transform;
+             transform.translate(hw, hh);
+             transform.rotate(angle, Qt::XAxis);
+             p.setTransform(transform);
+             drawFrame(&amp;p, fr.adjusted(-hw, -hh, -hw, -hh));
+             p.drawPixmap(-hw, -hh, m_lastPixmap);
+
+             <span class="comment">// the bottom part is still the old pixmap</span>
+             p.resetTransform();
+             p.setClipRect(0, hh, width(), hh);
+             drawFrame(&amp;p, fr);
+             p.drawPixmap(0, 0, m_lastPixmap);
+         } else {
+
+             p.setClipRect(0, hh, width(), hh);
+
+             <span class="comment">// the bottom part is still the old pixmap</span>
+             drawFrame(&amp;p, fr);
+             p.drawPixmap(0, 0, m_lastPixmap);
+
+             <span class="comment">// the bottom part of the new pixmap is flipping</span>
+             int angle = 180 - 180 * m_animator.currentFrame() / 100;
+             QTransform transform;
+             transform.translate(hw, hh);
+             transform.rotate(angle, Qt::XAxis);
+             p.setTransform(transform);
+             drawFrame(&amp;p, fr.adjusted(-hw, -hh, -hw, -hh));
+             p.drawPixmap(-hw, -hh, m_pixmap);
+
+         }
+
+     }
+
+     void paintRotate() {
+         QPainter p(this);
+
+         int pad = width() / 10;
+         QRect fr = rect().adjusted(pad, pad, -pad, -pad);
+         drawFrame(&amp;p, fr);
+         p.setClipRect(fr);
+
+         int angle1 = -180 * m_animator.currentFrame() / 100;
+         int angle2 = 180 - 180 * m_animator.currentFrame() / 100;
+         int angle = (m_animator.currentFrame() &lt;= 50) ? angle1 : angle2;
+         QPixmap pix = (m_animator.currentFrame() &lt;= 50) ? m_lastPixmap : m_pixmap;
+
+         QTransform transform;
+         transform.translate(width() / 2, height() / 2);
+         transform.rotate(angle, Qt::XAxis);
+
+         p.setTransform(transform);
+         p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+         p.drawPixmap(-width() / 2, -height() / 2, pix);
+     }
+
+     void paintEvent(QPaintEvent *event) {
+         Q_UNUSED(event);
+         if (m_animator.state() == QTimeLine::Running) {
+             if (m_transition == Slide)
+                 paintSlide();
+             if (m_transition == Flip)
+                 paintFlip();
+             if (m_transition == Rotate)
+                 paintRotate();
+         } else {
+             paintStatic();
+         }
+     }
+
+ private:
+     int m_number;
+     int m_transition;
+     QPixmap m_pixmap;
+     QPixmap m_lastPixmap;
+     QTimeLine m_animator;
+ };
+
+ class DigiFlip : public QMainWindow
+ {
+     Q_OBJECT
+
+ public:
+     DigiFlip(QWidget *parent = 0)
+         : QMainWindow(parent)
+     {
+         m_hour = new Digits(this);
+         m_hour-&gt;show();
+         m_minute = new Digits(this);
+         m_minute-&gt;show();
+
+         QPalette pal = palette();
+         pal.setColor(QPalette::Window, Qt::black);
+         setPalette(pal);
+
+         m_ticker.start(1000, this);
+         QTime t = QTime::currentTime();
+         m_hour-&gt;setNumber(t.hour());
+         m_minute-&gt;setNumber(t.minute());
+         updateTime();
+
+         QAction *slideAction = new QAction(&quot;&amp;Slide&quot;, this);
+         QAction *flipAction = new QAction(&quot;&amp;Flip&quot;, this);
+         QAction *rotateAction = new QAction(&quot;&amp;Rotate&quot;, this);
+         connect(slideAction, SIGNAL(triggered()), SLOT(chooseSlide()));
+         connect(flipAction, SIGNAL(triggered()), SLOT(chooseFlip()));
+         connect(rotateAction, SIGNAL(triggered()), SLOT(chooseRotate()));
+ #if defined(Q_OS_SYMBIAN) || defined(Q_OS_WINCE_WM)
+         menuBar()-&gt;addAction(slideAction);
+         menuBar()-&gt;addAction(flipAction);
+         menuBar()-&gt;addAction(rotateAction);
+ #else
+         addAction(slideAction);
+         addAction(flipAction);
+         addAction(rotateAction);
+         setContextMenuPolicy(Qt::ActionsContextMenu);
+ #endif
+     }
+
+     void updateTime() {
+         QTime t = QTime::currentTime();
+         m_hour-&gt;flipTo(t.hour());
+         m_minute-&gt;flipTo(t.minute());
+         QString str = t.toString(&quot;hh:mm:ss&quot;);
+         str.prepend(&quot;: &quot;);
+         if (m_hour-&gt;transition() == Digits::Slide)
+             str.prepend(&quot;Slide&quot;);
+         if (m_hour-&gt;transition() == Digits::Flip)
+             str.prepend(&quot;Flip&quot;);
+         if (m_hour-&gt;transition() == Digits::Rotate)
+             str.prepend(&quot;Rotate&quot;);
+         setWindowTitle(str);
+     }
+
+     void switchTransition(int delta) {
+         int i = (m_hour-&gt;transition() + delta + 3) % 3;
+         m_hour-&gt;setTransition(i);
+         m_minute-&gt;setTransition(i);
+         updateTime();
+     }
+
+ protected:
+     void resizeEvent(QResizeEvent*) {
+         int digitsWidth = width() / 2;
+         int digitsHeight = digitsWidth * 1.2;
+
+         int y = (height() - digitsHeight) / 3;
+
+         m_hour-&gt;resize(digitsWidth, digitsHeight);
+         m_hour-&gt;move(0, y);
+
+         m_minute-&gt;resize(digitsWidth, digitsHeight);
+         m_minute-&gt;move(width() / 2, y);
+     }
+
+     void timerEvent(QTimerEvent*) {
+         updateTime();
+     }
+
+     void keyPressEvent(QKeyEvent *event) {
+         if (event-&gt;key() == Qt::Key_Right) {
+             switchTransition(1);
+             event-&gt;accept();
+         }
+         if (event-&gt;key() == Qt::Key_Left) {
+             switchTransition(-1);
+             event-&gt;accept();
+         }
+     }
+
+ private slots:
+     void chooseSlide() {
+         m_hour-&gt;setTransition(0);
+         m_minute-&gt;setTransition(0);
+         updateTime();
+     }
+
+     void chooseFlip() {
+         m_hour-&gt;setTransition(1);
+         m_minute-&gt;setTransition(1);
+         updateTime();
+     }
+
+     void chooseRotate() {
+         m_hour-&gt;setTransition(2);
+         m_minute-&gt;setTransition(2);
+         updateTime();
+     }
+
+ private:
+     QBasicTimer m_ticker;
+     Digits *m_hour;
+     Digits *m_minute;
+ };
+
+ #include &quot;digiflip.moc&quot;
+
+ int main(int argc, char *argv[])
+ {
+     QApplication app(argc, argv);
+
+     DigiFlip time;
+ #if defined(Q_OS_SYMBIAN) || defined(Q_OS_WINCE_WM)
+     time.showMaximized();
+ #else
+     time.resize(320, 240);
+     time.show();
+ #endif
+
+     return app.exec();
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

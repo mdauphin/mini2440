@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: softkeys.cpp Example File (widgets/softkeys/softkeys.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">softkeys.cpp Example File<br /><span class="small-subtitle">widgets/softkeys/softkeys.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the examples of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &quot;softkeys.h&quot;
+
+ MainWindow::MainWindow(QWidget *parent)
+     : QMainWindow(parent)
+ {
+     central = new QWidget(this);
+     central-&gt;setContextMenuPolicy(Qt::NoContextMenu); <span class="comment">// explicitly forbid usage of context menu so actions item is not shown menu</span>
+     setCentralWidget(central);
+
+     <span class="comment">// Create text editor and set softkeys to it</span>
+     textEditor= new QTextEdit(tr(&quot;Navigate in UI to see context sensitive softkeys in action&quot;), this);
+     QAction* clear = new QAction(tr(&quot;Clear&quot;), this);
+     clear-&gt;setSoftKeyRole(QAction::NegativeSoftKey);
+
+     textEditor-&gt;addAction(clear);
+
+     ok = new QAction(tr(&quot;Ok&quot;), this);
+     ok-&gt;setSoftKeyRole(QAction::PositiveSoftKey);
+     connect(ok, SIGNAL(triggered()), this, SLOT(okPressed()));
+
+     cancel = new QAction(tr(&quot;Cancel&quot;), this);
+     cancel-&gt;setSoftKeyRole(QAction::NegativeSoftKey);
+     connect(cancel, SIGNAL(triggered()), this, SLOT(cancelPressed()));
+
+     infoLabel = new QLabel(tr(&quot;&quot;), this);
+     infoLabel-&gt;setContextMenuPolicy(Qt::NoContextMenu);
+
+     toggleButton = new QPushButton(tr(&quot;Custom&quot;), this);
+     toggleButton-&gt;setContextMenuPolicy(Qt::NoContextMenu);
+     toggleButton-&gt;setCheckable(true);
+
+     modeButton = new QPushButton(tr(&quot;Loop SK window type&quot;), this);
+     modeButton-&gt;setContextMenuPolicy(Qt::NoContextMenu);
+
+     modeLabel = new QLabel(tr(&quot;Normal maximized&quot;), this);
+     modeLabel-&gt;setContextMenuPolicy(Qt::NoContextMenu);
+
+     pushButton = new QPushButton(tr(&quot;File Dialog&quot;), this);
+     pushButton-&gt;setContextMenuPolicy(Qt::NoContextMenu);
+
+     QComboBox* comboBox = new QComboBox(this);
+     comboBox-&gt;setContextMenuPolicy(Qt::NoContextMenu);
+     comboBox-&gt;insertItems(0, QStringList()
+      &lt;&lt; QApplication::translate(&quot;MainWindow&quot;, &quot;Selection1&quot;, 0, QApplication::UnicodeUTF8)
+      &lt;&lt; QApplication::translate(&quot;MainWindow&quot;, &quot;Selection2&quot;, 0, QApplication::UnicodeUTF8)
+      &lt;&lt; QApplication::translate(&quot;MainWindow&quot;, &quot;Selection3&quot;, 0, QApplication::UnicodeUTF8)
+     );
+
+     layout = new QGridLayout;
+     layout-&gt;addWidget(textEditor, 0, 0, 1, 2);
+     layout-&gt;addWidget(infoLabel, 1, 0, 1, 2);
+     layout-&gt;addWidget(toggleButton, 2, 0);
+     layout-&gt;addWidget(pushButton, 2, 1);
+     layout-&gt;addWidget(comboBox, 3, 0, 1, 2);
+     layout-&gt;addWidget(modeButton, 4, 0, 1, 2);
+     layout-&gt;addWidget(modeLabel, 5, 0, 1, 2);
+     central-&gt;setLayout(layout);
+
+     fileMenu = menuBar()-&gt;addMenu(tr(&quot;&amp;File&quot;));
+     exit = new QAction(tr(&quot;&amp;Exit&quot;), this);
+     fileMenu-&gt;addAction(exit);
+
+     connect(clear, SIGNAL(triggered()), this, SLOT(clearTextEditor()));
+     connect(pushButton, SIGNAL(clicked()), this, SLOT(openDialog()));
+     connect(exit, SIGNAL(triggered()), this, SLOT(exitApplication()));
+     connect(toggleButton, SIGNAL(clicked()), this, SLOT(setCustomSoftKeys()));
+     connect(modeButton, SIGNAL(clicked()), this, SLOT(setMode()));
+     pushButton-&gt;setFocus();
+ }
+
+ MainWindow::~MainWindow()
+ {
+ }
+
+ void MainWindow::clearTextEditor()
+ {
+     textEditor-&gt;setText(tr(&quot;&quot;));
+ }
+
+ void MainWindow::openDialog()
+ {
+     QFileDialog::getOpenFileName(this);
+ }
+
+ void MainWindow::addSoftKeys()
+ {
+     addAction(ok);
+     addAction(cancel);
+ }
+
+ void MainWindow::setCustomSoftKeys()
+ {
+     if (toggleButton-&gt;isChecked()) {
+         infoLabel-&gt;setText(tr(&quot;Custom softkeys set&quot;));
+         addSoftKeys();
+         }
+     else {
+         infoLabel-&gt;setText(tr(&quot;Custom softkeys removed&quot;));
+         removeAction(ok);
+         removeAction(cancel);
+     }
+ }
+
+ void MainWindow::setMode()
+ {
+     if(isMaximized()) {
+         showFullScreen();
+         modeLabel-&gt;setText(tr(&quot;Normal Fullscreen&quot;));
+     } else {
+         Qt::WindowFlags flags = windowFlags();
+         if(flags &amp; Qt::WindowSoftkeysRespondHint) {
+             flags |= Qt::WindowSoftkeysVisibleHint;
+             flags &amp;= ~Qt::WindowSoftkeysRespondHint;
+             setWindowFlags(flags); <span class="comment">// Hides visible window</span>
+             showFullScreen();
+             modeLabel-&gt;setText(tr(&quot;Fullscreen with softkeys&quot;));
+         } else if(flags &amp; Qt::WindowSoftkeysVisibleHint) {
+             flags &amp;= ~Qt::WindowSoftkeysVisibleHint;
+             flags &amp;= ~Qt::WindowSoftkeysRespondHint;
+             setWindowFlags(flags); <span class="comment">// Hides visible window</span>
+             showMaximized();
+             modeLabel-&gt;setText(tr(&quot;Normal Maximized&quot;));
+         } else {
+             flags &amp;= ~Qt::WindowSoftkeysVisibleHint;
+             flags |= Qt::WindowSoftkeysRespondHint;
+             setWindowFlags(flags); <span class="comment">// Hides visible window</span>
+             showFullScreen();
+             modeLabel-&gt;setText(tr(&quot;Fullscreen with SK respond&quot;));
+         }
+     }
+ }
+
+ void MainWindow::exitApplication()
+ {
+     qApp-&gt;exit();
+ }
+
+ void MainWindow::okPressed()
+ {
+     infoLabel-&gt;setText(tr(&quot;OK pressed&quot;));
+ }
+
+ void MainWindow::cancelPressed()
+ {
+     infoLabel-&gt;setText(tr(&quot;Cancel pressed&quot;));
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: main.cpp Example File (script/qscript/main.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">main.cpp Example File<br /><span class="small-subtitle">script/qscript/main.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the examples of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &lt;qscriptengine.h&gt;
+
+ #include &lt;QtCore/QFile&gt;
+ #include &lt;QtCore/QTextStream&gt;
+ #include &lt;QtCore/QStringList&gt;
+ #include &lt;QtGui/QApplication&gt;
+
+ #include &lt;stdlib.h&gt;
+
+ #include &quot;bytearrayclass.h&quot;
+
+ static bool wantsToQuit;
+
+ static QScriptValue qtscript_quit(QScriptContext *ctx, QScriptEngine *eng)
+ {
+     Q_UNUSED(ctx);
+     wantsToQuit = true;
+     return eng-&gt;undefinedValue();
+ }
+
+ static void interactive(QScriptEngine *eng)
+ {
+     QScriptValue global = eng-&gt;globalObject();
+     QScriptValue quitFunction = eng-&gt;newFunction(qtscript_quit);
+     if (!global.property(QLatin1String(&quot;exit&quot;)).isValid())
+         global.setProperty(QLatin1String(&quot;exit&quot;), quitFunction);
+     if (!global.property(QLatin1String(&quot;quit&quot;)).isValid())
+         global.setProperty(QLatin1String(&quot;quit&quot;), quitFunction);
+     wantsToQuit = false;
+
+     QTextStream qin(stdin, QFile::ReadOnly);
+
+     const char *qscript_prompt = &quot;qs&gt; &quot;;
+     const char *dot_prompt = &quot;.... &quot;;
+     const char *prompt = qscript_prompt;
+
+     QString code;
+
+     forever {
+         QString line;
+
+         printf(&quot;%s&quot;, prompt);
+         fflush(stdout);
+
+         line = qin.readLine();
+         if (line.isNull())
+             break;
+
+         code += line;
+         code += QLatin1Char('\n');
+
+         if (line.trimmed().isEmpty()) {
+             continue;
+
+         } else if (! eng-&gt;canEvaluate(code)) {
+             prompt = dot_prompt;
+
+         } else {
+             QScriptValue result = eng-&gt;evaluate(code, QLatin1String(&quot;typein&quot;));
+
+             code.clear();
+             prompt = qscript_prompt;
+
+             if (! result.isUndefined())
+                 fprintf(stderr, &quot;%s\n&quot;, qPrintable(result.toString()));
+
+             if (wantsToQuit)
+                 break;
+         }
+     }
+ }
+
+ static QScriptValue importExtension(QScriptContext *context, QScriptEngine *engine)
+ {
+     return engine-&gt;importExtension(context-&gt;argument(0).toString());
+ }
+
+ static QScriptValue loadScripts(QScriptContext *context, QScriptEngine *engine)
+ {
+     for (int i = 0; i &lt; context-&gt;argumentCount(); ++i) {
+         QString fileName = context-&gt;argument(0).toString();
+         QFile file(fileName);
+         if (!file.open(QIODevice::ReadOnly))
+             return context-&gt;throwError(QString::fromLatin1(&quot;could not open %0 for reading&quot;).arg(fileName));
+         QTextStream ts(&amp;file);
+         QString contents = ts.readAll();
+         file.close();
+         QScriptContext *pc = context-&gt;parentContext();
+         context-&gt;setActivationObject(pc-&gt;activationObject());
+         context-&gt;setThisObject(pc-&gt;thisObject());
+         QScriptValue ret = engine-&gt;evaluate(contents);
+         if (engine-&gt;hasUncaughtException())
+             return ret;
+     }
+     return engine-&gt;undefinedValue();
+ }
+
+ int main(int argc, char *argv[])
+ {
+     QApplication *app;
+     if (argc &gt;= 2 &amp;&amp; !qstrcmp(argv[1], &quot;-tty&quot;)) {
+         ++argv;
+        --argc;
+         app = new QApplication(argc, argv, QApplication::Tty);
+     } else {
+         app = new QApplication(argc, argv);
+     }
+
+     QScriptEngine *eng = new QScriptEngine();
+
+     QScriptValue globalObject = eng-&gt;globalObject();
+
+     globalObject.setProperty(&quot;load&quot;, eng-&gt;newFunction(loadScripts, <span class="comment">/*length=*/</span>1));
+
+     {
+         if (!globalObject.property(&quot;qt&quot;).isObject())
+             globalObject.setProperty(&quot;qt&quot;, eng-&gt;newObject());
+         QScriptValue qscript = eng-&gt;newObject();
+         qscript.setProperty(&quot;importExtension&quot;, eng-&gt;newFunction(importExtension));
+         globalObject.property(&quot;qt&quot;).setProperty(&quot;script&quot;, qscript);
+     }
+
+     ByteArrayClass *byteArrayClass = new ByteArrayClass(eng);
+     globalObject.setProperty(&quot;ByteArray&quot;, byteArrayClass-&gt;constructor());
+
+     if (! *++argv) {
+         interactive(eng);
+         return EXIT_SUCCESS;
+     }
+
+     while (const char *arg = *argv++) {
+         QString fn = QString::fromLocal8Bit(arg);
+
+         if (fn == QLatin1String(&quot;-i&quot;)) {
+             interactive(eng);
+             break;
+         }
+
+         QString contents;
+         int lineNumber = 1;
+
+         if (fn == QLatin1String(&quot;-&quot;)) {
+             QTextStream stream(stdin, QFile::ReadOnly);
+             contents = stream.readAll();
+         }
+
+         else {
+             QFile file(fn);
+
+             if (file.open(QFile::ReadOnly)) {
+                 QTextStream stream(&amp;file);
+                 contents = stream.readAll();
+                 file.close();
+
+                 <span class="comment">// strip off #</span>!/usr/bin/env qscript line
+                 if (contents.startsWith(&quot;#!&quot;)) {
+                     contents.remove(0, contents.indexOf(&quot;\n&quot;));
+                     ++lineNumber;
+                 }
+             }
+         }
+
+         if (contents.isEmpty())
+             continue;
+
+         QScriptValue r = eng-&gt;evaluate(contents, fn, lineNumber);
+         if (eng-&gt;hasUncaughtException()) {
+             QStringList backtrace = eng-&gt;uncaughtExceptionBacktrace();
+             fprintf (stderr, &quot;    %s\n%s\n\n&quot;, qPrintable(r.toString()),
+                      qPrintable(backtrace.join(&quot;\n&quot;)));
+             return EXIT_FAILURE;
+         }
+     }
+
+     delete eng;
+     delete app;
+
+     return EXIT_SUCCESS;
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

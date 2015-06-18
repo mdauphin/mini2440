@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: embeddedsvgviewer.cpp Example File (demos/embedded/embeddedsvgviewer/embeddedsvgviewer.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">embeddedsvgviewer.cpp Example File<br /><span class="small-subtitle">demos/embedded/embeddedsvgviewer/embeddedsvgviewer.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the demonstration applications of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &lt;QPainter&gt;
+ #include &lt;QApplication&gt;
+
+ #include &quot;embeddedsvgviewer.h&quot;
+
+ EmbeddedSvgViewer::EmbeddedSvgViewer(const QString &amp;filePath)
+ {
+     qApp-&gt;setStyleSheet(&quot; QSlider:vertical { width: 50px; } \
+                           QSlider::groove:vertical { border: 1px solid black; border-radius: 3px; width: 6px; } \
+                           QSlider::handle:vertical { height: 25px; margin: 0 -22px; image: url(':/files/v-slider-handle.svg'); } \
+                        &quot;);
+
+     m_renderer = new QSvgRenderer(filePath);
+     m_imageSize = m_renderer-&gt;viewBox().size();
+
+     m_viewBoxCenter = (QPointF(m_imageSize.width() / qreal(2.0), m_imageSize.height() / qreal(2.0)));
+
+     m_zoomSlider = new QSlider(Qt::Vertical, this);
+     m_zoomSlider-&gt;setMaximum(150);
+     m_zoomSlider-&gt;setMinimum(1);
+
+     connect(m_zoomSlider, SIGNAL(valueChanged(int)), this, SLOT(setZoom(int)));
+     m_zoomSlider-&gt;setValue(100);
+
+     m_quitButton = new QPushButton(&quot;Quit&quot;, this);
+
+     connect(m_quitButton, SIGNAL(pressed()), QApplication::instance(), SLOT(quit()));
+
+     if (m_renderer-&gt;animated())
+         connect(m_renderer, SIGNAL(repaintNeeded()), this, SLOT(update()));
+
+ }
+
+ void EmbeddedSvgViewer::paintEvent(QPaintEvent *event)
+ {
+     Q_UNUSED(event)
+     QPainter painter(this);
+     m_renderer-&gt;setViewBox(m_viewBox);
+     m_renderer-&gt;render(&amp;painter);
+ }
+
+ void EmbeddedSvgViewer::mouseMoveEvent ( QMouseEvent * event )
+ {
+     int incX = int((event-&gt;globalX() - m_mousePress.x()) * m_imageScale);
+     int incY = int((event-&gt;globalY() - m_mousePress.y()) * m_imageScale);
+
+     QPointF newCenter;
+     newCenter.setX(m_viewBoxCenterOnMousePress.x() - incX);
+     newCenter.setY(m_viewBoxCenterOnMousePress.y() - incY);
+
+     QRectF newViewBox = getViewBox(newCenter);
+
+     <span class="comment">// Do a bounded move on the horizontal:</span>
+     if ( (newViewBox.left() &gt;= m_viewBoxBounds.left()) &amp;&amp;
+          (newViewBox.right() &lt;= m_viewBoxBounds.right()) )
+     {
+         m_viewBoxCenter.setX(newCenter.x());
+         m_viewBox.setLeft(newViewBox.left());
+         m_viewBox.setRight(newViewBox.right());
+     }
+
+     <span class="comment">// do a bounded move on the vertical:</span>
+     if (  (newViewBox.top() &gt;= m_viewBoxBounds.top()) &amp;&amp;
+           (newViewBox.bottom() &lt;= m_viewBoxBounds.bottom()) )
+     {
+         m_viewBoxCenter.setY(newCenter.y());
+         m_viewBox.setTop(newViewBox.top());
+         m_viewBox.setBottom(newViewBox.bottom());
+     }
+
+     update();
+ }
+
+ void EmbeddedSvgViewer::mousePressEvent ( QMouseEvent * event )
+ {
+     m_viewBoxCenterOnMousePress = m_viewBoxCenter;
+     m_mousePress = event-&gt;globalPos();
+ }
+
+ QRectF EmbeddedSvgViewer::getViewBox(QPointF viewBoxCenter)
+ {
+     QRectF result;
+     result.setLeft(viewBoxCenter.x() - (m_viewBoxSize.width() / 2));
+     result.setTop(viewBoxCenter.y() - (m_viewBoxSize.height() / 2));
+     result.setRight(viewBoxCenter.x() + (m_viewBoxSize.width() / 2));
+     result.setBottom(viewBoxCenter.y() + (m_viewBoxSize.height() / 2));
+     return result;
+ }
+
+ void EmbeddedSvgViewer::updateImageScale()
+ {
+     m_imageScale = qMax( (qreal)m_imageSize.width() / (qreal)width(),
+                                (qreal)m_imageSize.height() / (qreal)height())*m_zoomLevel;
+
+     m_viewBoxSize.setWidth((qreal)width() * m_imageScale);
+     m_viewBoxSize.setHeight((qreal)height() * m_imageScale);
+ }
+
+ void EmbeddedSvgViewer::resizeEvent ( QResizeEvent * <span class="comment">/* event */</span> )
+ {
+     qreal origZoom = m_zoomLevel;
+
+     <span class="comment">// Get the new bounds:</span>
+     m_zoomLevel = 1.0;
+     updateImageScale();
+     m_viewBoxBounds = getViewBox(QPointF(m_imageSize.width() / 2.0, m_imageSize.height() / 2.0));
+
+     m_zoomLevel = origZoom;
+     updateImageScale();
+     m_viewBox = getViewBox(m_viewBoxCenter);
+
+     QRect sliderRect;
+     sliderRect.setLeft(width() - m_zoomSlider-&gt;sizeHint().width());
+     sliderRect.setRight(width());
+     sliderRect.setTop(height()/4);
+     sliderRect.setBottom(height() - (height()/4));
+     m_zoomSlider-&gt;setGeometry(sliderRect);
+ }
+
+ void EmbeddedSvgViewer::setZoom(int newZoom)
+ {
+     m_zoomLevel = qreal(newZoom) / qreal(100);
+
+     updateImageScale();
+     m_viewBox = getViewBox(m_viewBoxCenter);
+
+     update();
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>

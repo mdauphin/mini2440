@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Qt 4.6: slideshow.cpp Example File (demos/embedded/fluidlauncher/slideshow.cpp)</title>
+  <link href="classic.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+<td align="left" valign="top" width="32"><a href="http://qt.nokia.com/"><img src="images/qt-logo.png" align="left" border="0" /></a></td>
+<td width="1">&nbsp;&nbsp;</td><td class="postheader" valign="center"><a href="index.html"><font color="#004faf">Home</font></a>&nbsp;&middot; <a href="classes.html"><font color="#004faf">All&nbsp;Classes</font></a>&nbsp;&middot; <a href="functions.html"><font color="#004faf">All&nbsp;Functions</font></a>&nbsp;&middot; <a href="overviews.html"><font color="#004faf">Overviews</font></a></td></tr></table><h1 class="title">slideshow.cpp Example File<br /><span class="small-subtitle">demos/embedded/fluidlauncher/slideshow.cpp</span>
+</h1>
+<pre><span class="comment"> /****************************************************************************
+ **
+ ** Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ ** All rights reserved.
+ ** Contact: Nokia Corporation (qt-info@nokia.com)
+ **
+ ** This file is part of the demonstration applications of the Qt Toolkit.
+ **
+ ** $QT_BEGIN_LICENSE:LGPL$
+ ** Commercial Usage
+ ** Licensees holding valid Qt Commercial licenses may use this file in
+ ** accordance with the Qt Commercial License Agreement provided with the
+ ** Software or, alternatively, in accordance with the terms contained in
+ ** a written agreement between you and Nokia.
+ **
+ ** GNU Lesser General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU Lesser
+ ** General Public License version 2.1 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.LGPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU Lesser General Public License version 2.1 requirements
+ ** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ **
+ ** In addition, as a special exception, Nokia gives you certain additional
+ ** rights.  These rights are described in the Nokia Qt LGPL Exception
+ ** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
+ **
+ ** GNU General Public License Usage
+ ** Alternatively, this file may be used under the terms of the GNU
+ ** General Public License version 3.0 as published by the Free Software
+ ** Foundation and appearing in the file LICENSE.GPL included in the
+ ** packaging of this file.  Please review the following information to
+ ** ensure the GNU General Public License version 3.0 requirements will be
+ ** met: http://www.gnu.org/copyleft/gpl.html.
+ **
+ ** If you have questions regarding the use of this file, please contact
+ ** Nokia at qt-info@nokia.com.
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/</span>
+
+ #include &lt;QBasicTimer&gt;
+ #include &lt;QList&gt;
+ #include &lt;QImage&gt;
+ #include &lt;QDir&gt;
+ #include &lt;QPainter&gt;
+ #include &lt;QPaintEvent&gt;
+
+ #include &lt;QDebug&gt;
+
+ #include &quot;slideshow.h&quot;
+
+ class SlideShowPrivate
+ {
+ public:
+     SlideShowPrivate();
+
+     int currentSlide;
+     int slideInterval;
+     QBasicTimer interSlideTimer;
+     QStringList imagePaths;
+
+     void showNextSlide();
+ };
+
+ SlideShowPrivate::SlideShowPrivate()
+ {
+     currentSlide = 0;
+     slideInterval = 10000; <span class="comment">// Default to 10 sec interval</span>
+ }
+
+ void SlideShowPrivate::showNextSlide()
+ {
+     currentSlide++;
+     if (currentSlide &gt;= imagePaths.size())
+       currentSlide = 0;
+ }
+
+ SlideShow::SlideShow(QWidget* parent) :
+     QWidget(parent)
+ {
+     d = new SlideShowPrivate;
+
+     setAttribute(Qt::WA_StaticContents, true);
+     setAttribute(Qt::WA_OpaquePaintEvent, true);
+     setAttribute(Qt::WA_NoSystemBackground, true);
+
+     setMouseTracking(true);
+ }
+
+ SlideShow::~SlideShow()
+ {
+     delete d;
+ }
+
+ void SlideShow::addImageDir(QString dirName)
+ {
+     QDir dir(dirName);
+
+     QStringList fileNames = dir.entryList(QDir::Files | QDir::Readable, QDir::Name);
+
+     for (int i=0; i&lt;fileNames.count(); i++)
+         d-&gt;imagePaths &lt;&lt; dir.absoluteFilePath(fileNames[i]);
+ }
+
+ void SlideShow::addImage(QString filename)
+ {
+     d-&gt;imagePaths &lt;&lt; filename;
+ }
+
+ void SlideShow::clearImages()
+ {
+     d-&gt;imagePaths.clear();
+ }
+
+ void SlideShow::startShow()
+ {
+     d-&gt;interSlideTimer.start(d-&gt;slideInterval, this);
+     d-&gt;showNextSlide();
+     update();
+ }
+
+ void SlideShow::stopShow()
+ {
+     d-&gt;interSlideTimer.stop();
+ }
+
+ int SlideShow::slideInterval()
+ {
+     return d-&gt;slideInterval;
+ }
+
+ void SlideShow::setSlideInterval(int val)
+ {
+     d-&gt;slideInterval = val;
+ }
+
+ void SlideShow::timerEvent(QTimerEvent* event)
+ {
+     Q_UNUSED(event);
+     d-&gt;showNextSlide();
+     update();
+ }
+
+ void SlideShow::paintEvent(QPaintEvent *event)
+ {
+     QPainter painter(this);
+     painter.setRenderHint(QPainter::Antialiasing, false);
+
+     if (d-&gt;imagePaths.size() &gt; 0) {
+         QPixmap slide = QPixmap(d-&gt;imagePaths[d-&gt;currentSlide]);
+         QSize slideSize = slide.size();
+         QSize scaledSize = QSize(qMin(slideSize.width(), size().width()),
+             qMin(slideSize.height(), size().height()));
+         if (slideSize != scaledSize)
+             slide = slide.scaled(scaledSize, Qt::KeepAspectRatio);
+
+         QRect pixmapRect(qMax( (size().width() - slide.width())/2, 0),
+                          qMax( (size().height() - slide.height())/2, 0),
+                          slide.width(),
+                          slide.height());
+
+         if (pixmapRect.top() &gt; 0) {
+             <span class="comment">// Fill in top &amp; bottom rectangles:</span>
+             painter.fillRect(0, 0, size().width(), pixmapRect.top(), Qt::black);
+             painter.fillRect(0, pixmapRect.bottom(), size().width(), size().height(), Qt::black);
+         }
+
+         if (pixmapRect.left() &gt; 0) {
+             <span class="comment">// Fill in left &amp; right rectangles:</span>
+             painter.fillRect(0, 0, pixmapRect.left(), size().height(), Qt::black);
+             painter.fillRect(pixmapRect.right(), 0, size().width(), size().height(), Qt::black);
+         }
+
+         painter.drawPixmap(pixmapRect, slide);
+
+     } else
+         painter.fillRect(event-&gt;rect(), Qt::black);
+ }
+
+ void SlideShow::keyPressEvent(QKeyEvent* event)
+ {
+     Q_UNUSED(event);
+     emit inputReceived();
+ }
+
+ void SlideShow::mouseMoveEvent(QMouseEvent* event)
+ {
+     Q_UNUSED(event);
+     emit inputReceived();
+ }
+
+ void SlideShow::mousePressEvent(QMouseEvent* event)
+ {
+     Q_UNUSED(event);
+     emit inputReceived();
+ }
+
+ void SlideShow::mouseReleaseEvent(QMouseEvent* event)
+ {
+     Q_UNUSED(event);
+     emit inputReceived();
+ }
+
+ void SlideShow::showEvent(QShowEvent * event )
+ {
+     Q_UNUSED(event);
+ #ifndef QT_NO_CURSOR
+     setCursor(Qt::BlankCursor);
+ #endif
+ }</pre>
+<p /><address><hr /><div align="center">
+<table width="100%" cellspacing="0" border="0"><tr class="address">
+<td width="40%" align="left">Copyright &copy; 2010 Nokia Corporation and/or its subsidiary(-ies)</td>
+<td width="20%" align="center"><a href="trademarks.html">Trademarks</a></td>
+<td width="40%" align="right"><div align="right">Qt 4.6.3</div></td>
+</tr></table></div></address></body>
+</html>
